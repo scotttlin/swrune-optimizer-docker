@@ -1,7 +1,7 @@
 Summoners War Rune Optimizer Docker
 =================
 
-This is a fork of [tutum-docker-lamp] (https://github.com/tutumcloud/lamp)
+This is a fork of [tutum-docker-lamp] (https://github.com/tutumcloud/lamp) to include [Summoners War Rune Database](http://swrunes.all.my/)
 
 Usage
 -----
