@@ -30,7 +30,7 @@ RUN a2enmod rewrite
 
 # Configure /app folder with rune optimizer
 RUN mkdir -p /app && rm -fr /var/www/html && ln -s /app /var/www/html
-ADD ./AllMySWRunes/swrunes /app
+COPY AllMySWRunes/swrunes /app
 
 #Environment variables to configure php
 ENV PHP_MAX_EXECUTION_TIME 900
