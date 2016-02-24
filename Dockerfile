@@ -32,8 +32,11 @@ RUN mkdir -p /app && rm -fr /var/www/html && ln -s /app /var/www/html
 ADD ./AllMySWRunes/swrunes /app
 
 #Environment variables to configure php
+ENV PHP_MAX_EXECUTION_TIME 900
+ENV PHP_MAX_INPUT_TIME 90
+ENV PHP_MEMORY_LIMIT 512M
 ENV PHP_UPLOAD_MAX_FILESIZE 10M
-ENV PHP_POST_MAX_SIZE 10M
+ENV PHP_POST_MAX_SIZE 16M
 
 # Add volumes for MySQL
 VOLUME  ["/etc/mysql", "/var/lib/mysql" ]
