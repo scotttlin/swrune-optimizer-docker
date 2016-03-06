@@ -1,17 +1,15 @@
 <html>
 <body>
 <?php
-
 include("dbwrapper.php");
-$dbase = new Wrapper("sw_user","sw_pass","localhost","sw_runes",null);
+
+$dbase = new Wrapper($sw_user,$sw_pass,$host,$sw_db,null);
 
 $totalRecords = $dbase->getTotalRecords();
 //$totalSessions = $dbase->getUniqueSessions();
 $recordsPerSession = $dbase->getSessionsAndRecords();
 
 $dbase->close();
-//print_r($totalRecords); echo "<br/>";
-//print_r($recordsPerSession); echo "<br/>";
 
 echo "Statistics for the most recent usage (last 1 hour): <br/>";
 echo "Total builds count: ".$totalRecords[0]["cnt"]."<br/>";
@@ -27,6 +25,8 @@ if(count($recordsPerSession) > 0){
 	echo "</tbody> </table>
 	";
 }
+
+
 ?>
 
 </body>

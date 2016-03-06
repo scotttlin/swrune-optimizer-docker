@@ -1,7 +1,9 @@
 <?php
 ini_set('display_errors',0);
 error_reporting(0);
-header('Content-Type: application/json');
+header('Content-Type: text/json');
+include("dbwrapper.php");
+
 
 $allSets = array( 
 	"Energy"=> array(2, "HP%", 15), 
@@ -588,9 +590,7 @@ function extendMonster($monster, $runes) {
 	return $monster_x;
 }
 
-include("dbwrapper.php");
-
-if(!isset($_POST["setsForAllSlots"]) || !isset($_POST["monster"]) || !isset($_POST["requestedSetTypes"]) || !isset($_POST["allRunePermutations"]) || !isset($_POST["sessionId"]) || !isset($_POST["optimize_run"]) || !isset($_POST["created"]) 
+if(!isset($_POST["setsForAllSlots"]) || !isset($_POST["monster"]) || !isset($_POST["requestedSetTypes"]) || !isset($_POST["allRunePermutations"]) || !isset($_POST["sessionId"]) || !isset($_POST["optimize_run"]) 
 || !is_numeric($_POST["sessionId"]) || !is_numeric($_POST["optimize_run"])) {
 	$ajax_result = newResult();
 	echo json_encode($ajax_result);
@@ -598,7 +598,9 @@ if(!isset($_POST["setsForAllSlots"]) || !isset($_POST["monster"]) || !isset($_PO
 }
 
 try{
-	$dbase = new Wrapper("sw_user","sw_pass","localhost","sw_runes",null);
+	$dbase = new Wrapper($sw_user,$sw_pass,$host,$sw_db,null);
+	
+	$filename = $import_file_path.$_POST["sessionId"]."_".$_POST["optimize_run"].".csv";
 
 	$ajax_result = newResult();
 	$newRows = 0;
@@ -614,6 +616,7 @@ try{
 	// write results in DB
 	$length = count($allRunePermutations);
 	$index = 0;
+	$contents = "";
 
 	$ajax_result["error"] = "";
 	/*if($length > 0 && $_POST["optimize_call"] == 1){
@@ -631,28 +634,50 @@ try{
 		for($i1=0; $i1 <6; $i1++) {
 			$buildRunes[] = getRowDataById($runes[$i1],$allRunePermutations[$index][$i1]);
 		}
-		
 		$monster_x = extendMonster( $monster, $buildRunes);
 		
-		$extendedMonsters[] = $monster_x;
-		
-		if($index == $length-1 || count($extendedMonsters) == 5000) {
-			$after = microtime(true);
-			$difference = $after - $before;
+		if($use_file != 1) {
+			$extendedMonsters[] = $monster_x;
 			
-			$ajax_result["error"] .= " Memory at run ".$index.": ".memory_get_usage();
-			$ajax_result["error"] .= " time calc: ".$difference;
-			$before = microtime(true);
-			$newRows += $dbase->newOptimization($_POST["sessionId"], $_POST["optimize_run"], $_POST["created"], $monster["id"], $extendedMonsters);
-			$after = microtime(true);
-			$difference = $after - $before;
-			$ajax_result["error"] .= " time db: ".$difference;
-			$before = microtime(true);
+			if($index == $length-1 || count($extendedMonsters) == 5000) {
+				$after = microtime(true);
+				$difference = $after - $before;
+				
+				$ajax_result["error"] .= " Memory at run ".$index.": ".memory_get_usage();
+				$ajax_result["error"] .= " time calc: ".$difference;
+				$before = microtime(true);
+				$newRows += $dbase->newOptimization($_POST["sessionId"].$_POST["optimize_run"], $monster["id"], $extendedMonsters);
+				$after = microtime(true);
+				$difference = $after - $before;
+				$ajax_result["error"] .= " time db: ".$difference;
+				file_put_contents("db_insert.txt", date("Y-m-d H:i:s").";".$difference.";".$_POST["sessionId"]."\n",FILE_APPEND | LOCK_EX);
+				$before = microtime(true);
 
-			unset($extendedMonsters);
-			$extendedMonsters = array();
+				unset($extendedMonsters);
+				$extendedMonsters = array();
+			}
+		}	else{
+			/*$redisClient = new Redis();
+			$redisClient->connect('127.0.0.1');*/
+			
+			$contents .= $_POST["sessionId"].$_POST["optimize_run"].";".$monster["id"].";".$monster_x["rune_ids"].";".$monster_x["sets"].";".$monster_x["a_hp"].";".$monster_x["a_atk"].";".$monster_x["a_def"].";".$monster_x["a_spd"].";".$monster_x["a_crate"].";".$monster_x["a_cdmg"].";".$monster_x["a_res"].";".$monster_x["a_acc"].";".$monster_x["a_dps"].";".$monster_x["a_effhp"].";".$monster_x["a_effhp_d"].";".$monster_x["m_hp"].";".$monster_x["m_atk"].";".$monster_x["m_def"].";".$monster_x["m_spd"].";".$monster_x["m_crate"].";".$monster_x["m_cdmg"].";".$monster_x["m_res"].";".$monster_x["m_acc"].";".$monster_x["m_dps"].";".$monster_x["m_effhp"].";".$monster_x["m_effhp_d"].";".$monster_x["slots246"].";".$monster_x["substat_skillups"]."\n";
+			$newRows++;
 		}
 	}
+	
+	if($use_file == 1) {
+		file_put_contents(
+			$filename,
+			$contents,
+			FILE_APPEND | LOCK_EX
+		);
+	}
+	/*$before = microtime(true);
+	loadFromFile($swrunes_dir.$filename);
+	unlink($filename);
+	$after = microtime(true);
+	$difference = $after - $before;
+	$ajax_result["error"] .= " file load db: ".$difference;*/
 
 	$ajax_result["id"] = $newRows;
 	$ajax_result["success"] = true;
@@ -663,6 +688,7 @@ try{
 }catch(Exception $e){
 	$ajax_result = newResult();
 	$ajax_result["optimize_run"] = $_POST["optimize_run"];
+	$ajax_result["error"] = $e->getMessage();
 	echo json_encode($ajax_result);
 }
 ?>

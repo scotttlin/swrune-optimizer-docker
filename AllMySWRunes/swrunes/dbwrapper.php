@@ -1,4 +1,37 @@
 <?php
+include("config.php");
+// DB function for file
+function loadFromFile($filename) {
+	GLOBAL $host, $sw_user, $sw_pass, $sw_db;
+	$conn = mysql_connect($host, $sw_user, $sw_pass);
+	mysql_select_db($sw_db, $conn);
+	mysql_query("LOAD DATA LOCAL INFILE '".$filename."' INTO TABLE sw_optimizer
+	FIELDS TERMINATED BY ';'
+	LINES TERMINATED BY '\n'
+	(session, monster_id, rune_ids, sets, a_hp, a_atk, a_def, a_spd, a_crate, a_cdmg, a_res, a_acc, a_dps, a_effhp, a_effhp_d, m_hp, m_atk, m_def, m_spd, m_crate, m_cdmg, m_res, m_acc, m_dps, m_effhp, m_effhp_d, slots246, substat_skillups) ");
+	mysql_close($conn);
+	return 1;
+}
+
+
+function loadFromFile2($filename) {
+	GLOBAL $host, $sw_user, $sw_pass, $sw_db;
+	$mysqli  =  new mysqli($host,$sw_user,$sw_pass,$sw_db);
+	/* check connection */
+	if (mysqli_connect_errno()) {
+    return "No connection to database.";
+	}
+	$sql = "LOAD DATA LOCAL INFILE '".$filename."' INTO TABLE sw_optimizer
+	FIELDS TERMINATED BY ';'
+	LINES TERMINATED BY '\n'
+	(session, monster_id, rune_ids, sets, a_hp, a_atk, a_def, a_spd, a_crate, a_cdmg, a_res, a_acc, a_dps, a_effhp, a_effhp_d, m_hp, m_atk, m_def, m_spd, m_crate, m_cdmg, m_res, m_acc, m_dps, m_effhp, m_effhp_d, slots246, substat_skillups) ";
+	if (!($stmt = $mysqli->query($sql))) {
+    return $mysqli->error;
+	}
+	return 1;
+}
+
+
 //----------------------------------------------------------------------------------
 // class DBWrapper
 //----------------------------------------------------------------------------------
@@ -69,10 +102,10 @@ class Wrapper
 		return $this->db->lastInsertId();
 	}
 
-  	private function getDatabase() 
+  private function getDatabase() 
 	{
     if ($this->db === null) {
-    try { 
+    	try { 
 			$port_string="";
 			if(isset($this->port) && !empty($this->port))
 				$port_string=";port=".$this->port;
@@ -81,15 +114,17 @@ class Wrapper
 			$this->db->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
 			$this->db->setAttribute(PDO::ATTR_CASE, PDO::CASE_LOWER);
 			$this->db->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
-			} 
-			catch(PDOException $e) { 
-				die ('Unable to connect to Database!');
-			}
+			$this->db->setAttribute(PDO::MYSQL_ATTR_LOCAL_INFILE, 1);
+		} 
+		catch(PDOException $e) { 
+			throw new Exception('Unable to connect to Database! Error message: '.$e->getMessage());
+			//die ('Unable to connect to Database! Error message: '.$e->getMessage());
 		}
+	}
     return $this->db;
   }
 	
-	public function newOptimization($session, $optimize_run, $created, $monster_id,& $data)
+	public function newOptimization($session, $monster_id,& $data)
 	{
 		$step = 10000;
 		$total = count($data);
@@ -104,13 +139,13 @@ class Wrapper
 					if(!empty($values)) {
 						$values .= ",";
 					}
-					$values .= "('".$session."','".$optimize_run."',NOW(),'".$monster_id."','".$data[$index]["rune_ids"]."','".$data[$index]["sets"]."',".$data[$index]["a_hp"].",".$data[$index]["a_atk"].",".$data[$index]["a_def"].",".$data[$index]["a_spd"].",".$data[$index]["a_crate"].",".$data[$index]["a_cdmg"].",".$data[$index]["a_res"].",".$data[$index]["a_acc"].",".$data[$index]["m_hp"].",".$data[$index]["m_atk"].",".$data[$index]["m_def"].",".$data[$index]["m_spd"].",".$data[$index]["m_crate"].",".$data[$index]["m_cdmg"].",".$data[$index]["m_res"].",".$data[$index]["m_acc"].",'".$data[$index]["slots246"]."','".$data[$index]["substat_skillups"]."','".$data[$index]["a_dps"]."','".$data[$index]["m_dps"]."','".$data[$index]["a_effhp"]."','".$data[$index]["a_effhp_d"]."','".$data[$index]["m_effhp"]."','".$data[$index]["m_effhp_d"]."')";
+					$values .= "('".$session."','".$monster_id."','".$data[$index]["rune_ids"]."','".$data[$index]["sets"]."',".$data[$index]["a_hp"].",".$data[$index]["a_atk"].",".$data[$index]["a_def"].",".$data[$index]["a_spd"].",".$data[$index]["a_crate"].",".$data[$index]["a_cdmg"].",".$data[$index]["a_res"].",".$data[$index]["a_acc"].",".$data[$index]["m_hp"].",".$data[$index]["m_atk"].",".$data[$index]["m_def"].",".$data[$index]["m_spd"].",".$data[$index]["m_crate"].",".$data[$index]["m_cdmg"].",".$data[$index]["m_res"].",".$data[$index]["m_acc"].",'".$data[$index]["slots246"]."','".$data[$index]["substat_skillups"]."','".$data[$index]["a_dps"]."','".$data[$index]["m_dps"]."','".$data[$index]["a_effhp"]."','".$data[$index]["a_effhp_d"]."','".$data[$index]["m_effhp"]."','".$data[$index]["m_effhp_d"]."')";
 					$i1 += 1;
 				}
 				$this->db = $this->getDatabase();
 				$count = $this->db->exec(
 				'INSERT INTO sw_optimizer
-				(`session`, `optimize_run`, `created`, `monster_id`, `rune_ids`, `sets`, `a_hp`, `a_atk`, `a_def`, `a_spd`, `a_crate`, `a_cdmg`, `a_res`, `a_acc`, `m_hp`, `m_atk`, `m_def`, `m_spd`, `m_crate`, `m_cdmg`, `m_res`, `m_acc`, `slots246`, `substat_skillups`, `a_dps`, `m_dps`,`a_effhp`,`a_effhp_d`,`m_effhp`,`m_effhp_d`) 
+				(session, `monster_id`, `rune_ids`, `sets`, `a_hp`, `a_atk`, `a_def`, `a_spd`, `a_crate`, `a_cdmg`, `a_res`, `a_acc`, `m_hp`, `m_atk`, `m_def`, `m_spd`, `m_crate`, `m_cdmg`, `m_res`, `m_acc`, `slots246`, `substat_skillups`, `a_dps`, `m_dps`,`a_effhp`,`a_effhp_d`,`m_effhp`,`m_effhp_d`) 
 				VALUES '.$values);
 				$rowCount = $rowCount + $count;
 			}
@@ -121,6 +156,24 @@ class Wrapper
 			$i = $i + $i1;
 		}
 		return $rowCount;
+	}
+	
+	public function newOptimizationFromFile($filename)
+	{
+		try {
+			$this->db = $this->getDatabase();
+			$count = $this->db->exec(
+			"LOAD DATA LOCAL INFILE '".$filename."' INTO TABLE sw_optimizer
+	FIELDS TERMINATED BY ';'
+	LINES TERMINATED BY '\n'
+	(session, monster_id, rune_ids, sets, a_hp, a_atk, a_def, a_spd, a_crate, a_cdmg, a_res, a_acc, a_dps, a_effhp, a_effhp_d, m_hp, m_atk, m_def, m_spd, m_crate, m_cdmg, m_res, m_acc, m_dps, m_effhp, m_effhp_d, slots246, substat_skillups) ");
+			return $count;
+		}
+		catch(PDOException $e) { 
+			throw new Exception('Unable to load file '.$filename.'! Error message: '.$e->getMessage());
+			//$e->getMessage();
+		}	
+		return 0;
 	}
 	
 	public function Maintenance()
@@ -139,7 +192,7 @@ class Wrapper
 		return array();
 	}
 
-	public function deleteOld($minutes)
+	/*public function deleteOld($minutes)
 	{
 		try {
 			$this->db = $this->getDatabase();
@@ -158,7 +211,7 @@ class Wrapper
 			//$e->getMessage();
     	}
 		return 0;
-	}
+	}*/
 	
 	
 	public function deleteBySession($session, $optimize_run)
@@ -182,7 +235,7 @@ class Wrapper
 		return 0;
 	}
 	
-	public function getOptimization($session, $optimize_run, $post, $search, $orderBy, $orderWay, $start, $count, $count_only=false)
+	public function getOptimization($session, $post, $search, $orderBy, $orderWay, $start, $count, $count_only=false)
 	{
 		if( $orderWay != "asc" && $orderWay != "desc" && $orderWay != "ASC" && $orderWay != "DESC") {
 			if($count_only){
@@ -198,7 +251,6 @@ class Wrapper
 		$select = "";
 		$orderby = "";
 		$params[] = $session;
-		$params[] = $optimize_run;
 		$filter_type = "a";
 		if( !empty($post["filter_type_div"]) && $post["filter_type_div"] == "m") {
 			$filter_type = "m";
@@ -318,7 +370,7 @@ class Wrapper
 			$statm = $this->db->prepare(
 			"SELECT ".$select."
 			FROM sw_optimizer 
-			WHERE session = ? AND optimize_run = ? ".$cond." ".$orderby." ".$limit);
+			WHERE session = ? ".$cond." ".$orderby." ".$limit);
 			$statm->execute($params);
 
 			return $statm->fetchAll();
@@ -393,7 +445,6 @@ class Wrapper
 			"CREATE TABLE IF NOT EXISTS ".$table." (
 				`session` varchar(20) COLLATE utf8_bin NOT NULL,
 				`optimize_run` varchar(3) COLLATE utf8_bin NOT NULL,
-				`created` datetime NOT NULL,
 				`rune_ids` varchar(50) COLLATE utf8_bin NOT NULL,
 				`sets` varchar(50) COLLATE utf8_bin DEFAULT NULL,
 				`a_hp` int(11) NOT NULL,
@@ -420,7 +471,7 @@ class Wrapper
 				KEY `session_run` (`session`,`optimize_run`),
 				KEY `sets` (`sets`),
 				KEY `slots246` (`slots246`)
-			) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_bin 
+			) ENGINE=MyISAM DEFAULT CHARSET=utf8 COLLATE=utf8_bin 
 			AS SELECT * from sw_optimizer WHERE created >= DATE_SUB(NOW(), INTERVAL ".$minutes." MINUTE) ");
 			$statm->execute();
 
@@ -438,10 +489,7 @@ class Wrapper
 			$this->db = $this->getDatabase();
 			$statm = $this->db->prepare(
 	"CREATE TABLE IF NOT EXISTS ".$table." (
-		`id` int(11) NOT NULL AUTO_INCREMENT,
-		`session` varchar(20) COLLATE utf8_bin NOT NULL,
-		`optimize_run` varchar(3) COLLATE utf8_bin NOT NULL,
-		`created` datetime NOT NULL,
+		`session` int(9) NOT NULL,
 		`rune_ids` varchar(50) COLLATE utf8_bin NOT NULL,
 		`sets` varchar(50) COLLATE utf8_bin DEFAULT NULL,
 		`a_hp` int(11) NOT NULL,
@@ -467,13 +515,10 @@ class Wrapper
 		`m_effhp` int(11) NOT NULL,
 		`m_effhp_d` int(11) NOT NULL,
 		`slots246` varchar(50) COLLATE utf8_bin NOT NULL,
-		`substat_skillups` int(11) DEFAULT NULL,
+		`substat_skillups` int(11) DEFAULT 0,
 		`monster_id` int(11) NOT NULL,
-		PRIMARY KEY (`id`),
-		KEY `session_run` (`session`,`optimize_run`),
-		KEY `sets` (`sets`),
-		KEY `slots246` (`slots246`)
-	) ENGINE=InnoDB  DEFAULT CHARSET=utf8 COLLATE=utf8_bin AUTO_INCREMENT=1 ");
+		KEY `session_run` (`session`)
+	) ENGINE=InnoDB  DEFAULT CHARSET=utf8 COLLATE=utf8_bin ");
 			$statm->execute();
 
 			return $statm->fetchAll();

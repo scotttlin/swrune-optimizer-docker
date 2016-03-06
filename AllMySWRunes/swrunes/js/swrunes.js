@@ -1,6 +1,7 @@
 // General Data and empty objects
 var localDataName = "swrunes_saveddata";
 var localDataDateName = "swrunes_date";
+var useFile = 1;
 var allSets = { 
 	"Energy": [2, "HP%", 15], //0
 	"Fatal":[4, "ATK%", 35], //1
@@ -192,7 +193,11 @@ function initRunesTable(dataSet) {
 				"orderData": [ 12 ],
 				"targets": [ 11 ]
 			}
-		]
+		],
+		"createdRow": function( row, data, dataIndex ) {
+			colour = determineRuneColour(data);
+			$(row).css({"color": colour});
+		}
 	});
 }
 
@@ -322,7 +327,11 @@ function initSubRunesTable(dataSet) {
 						return calculateRuneEfficiency(data);
 				},
 				"targets": 6 }
-		]
+		],
+		"createdRow": function( row, data, dataIndex ) {
+			colour = determineRuneColour(data);
+			$(row).css({"color": colour});
+		}
 	});
 }
 
@@ -628,6 +637,20 @@ function updateRune(table) {
 	table.rows().invalidate().draw();
 }
 
+function determineRuneColour(rune) {
+	res = "black";
+	if(rune.s4_t && rune.s4_v && rune.s4_v > 0) {
+		res = "#D4A017";
+	}else if(rune.s3_t && rune.s3_v && rune.s3_v > 0) {
+		res = "purple";
+	}	else if(rune.s2_t && rune.s2_v && rune.s2_v > 0) {
+		res = "#48CCCD";
+	}	else if(rune.s1_t && rune.s1_v && rune.s1_v > 0) {
+		res = "green";
+	}
+	return res;
+}
+
 // ----------------------------- Monster management functions
 // display monster in "Monster details" panel
 function displayMonster(monster) {
@@ -838,11 +861,12 @@ function displayMonsterActualStats(elementId, monster) {
 function displayRuneSlot(elementId, rune, slot, displayMax) {
 	var newHtml = '';
 	if(rune) {
+		colour = determineRuneColour(rune);
 		var stars = '' + rune.grade + '<img src="images/star1.jpg" height="10px" >';
 		/*for(var i=0;i<rune.grade;i++) {
 			stars += "*";
 		}*/
-		newHtml = '<div class="row">\
+		newHtml = '<div class="row" style="color:' + colour + ';">\
 		<strong><center>'+stars+' +'+rune.level+' '+rune.set+' ('+rune.slot+')\
 		<br/>Efficiency ' + calculateRuneEfficiency(rune) + '%\
 		</center></strong>\
@@ -1251,6 +1275,7 @@ function extendMonster(monster, runes, clearExtraFields) {
 }
 
 function calculateRuneEfficiency(rune) {
+	var eff_base = 0;
 	var eff = 0;
 	if(rune.grade >= 4) {
 		if(rune.i_t != "" || rune.i_v != "") {
@@ -1269,7 +1294,7 @@ function calculateRuneEfficiency(rune) {
 			eff += (rune.s4_t.indexOf("flat") > -1 ? 0.5 : 1) * rune.s4_v / (5 * subStatsUpgradesMax[rune.s4_t]["g"+rune.grade]);
 		}
 		if(eff >0){
-			eff = ((eff + 1) / 2.8) * 100;
+			eff = ( (eff + eff_base) / (1.8 + eff_base) ) * 100;
 		}
 	}
 	return eff.toFixed(2);
@@ -1361,6 +1386,14 @@ function findMaxId(data) {
 }
 
 // ----------------------------- Optimizer functions
+function calculateEstimate(total) {
+// 337284 = 7.2 sec
+// 399168 = 11.2 ; 10.1
+// lets say 400k for 11sec or 100k for 2.8 sec
+	var res = total / 100000 * 3;
+	return res.toFixed(1);
+}
+
 function totalRunes(data) {
 	var count = 0;
 	for(var id in data) {
@@ -1941,13 +1974,14 @@ function optimize(gridRunes, gridMons, focusSelected, saveToFile) {
 	//target_optimize_calls_count = Math.ceil(length / step);
 	var j = 0;
 	
+	
 	var calculateAndSaveToFile = function() {
 		var length = allRunePermutations.length;
 		if(length > 0) {
 			$("#opt_time").html("" + moment().format('MMM Do YY HH:mm:ss') + ": Calculating builds stats 0 /" + length + ". Press Abort to stop.");
 			var monster = getRowDataById(gridMons, $('#opt_monster').val());
 			
-			var extendedMonsters = "runeIds;sets;actual HP;actual ATK;actual DEF;actual SPD;actual CRate;actual CDmg;actual RES;actual ACC;+15 HP;+15 ATK;+15 DEF;+15 SPD;+15 CRate;+15 CDmg;+15 RES;+15 ACC;slots 2/4/7;substats upgrades;\n";
+			var extendedMonsters = "runeIds;sets;actual HP;actual ATK;actual DEF;actual SPD;actual CRate;actual CDmg;actual RES;actual ACC;actual DPS;actual Eff.HP;actual Eff.HP def br;+15 HP;+15 ATK;+15 DEF;+15 SPD;+15 CRate;+15 CDmg;+15 RES;+15 ACC;+15 DPS;+15 Eff.HP;+15 Eff.HP def br;slots 2/4/7;substats upgrades;\n";
 
 			var index = 0;
 			var displayBuilds = function() {
@@ -1962,7 +1996,7 @@ function optimize(gridRunes, gridMons, focusSelected, saveToFile) {
 					// make copy of the monster and extend it
 					var monster_x = extendMonster( JSON.parse(JSON.stringify(monster)), allRunePermutations[index], false);
 					
-					extendedMonsters += monster_x.rune_ids + ";" + monster_x.sets + ";" + monster_x.a_hp + ";" + monster_x.a_atk + ";" + monster_x.a_def + ";" + monster_x.a_spd + ";" + monster_x.a_crate + ";" + monster_x.a_cdmg + ";" + monster_x.a_res + ";" + monster_x.a_acc + ";" + monster_x.m_hp + ";" + monster_x.m_atk + ";" + monster_x.m_def + ";" + monster_x.m_spd + ";" + monster_x.m_crate + ";" + monster_x.m_cdmg + ";" + monster_x.m_res + ";" + monster_x.m_acc + ";" + monster_x.slots246 + ";" + monster_x.substat_skillups + ";";
+					extendedMonsters += monster_x.rune_ids + ";" + monster_x.sets + ";" + monster_x.a_hp + ";" + monster_x.a_atk + ";" + monster_x.a_def + ";" + monster_x.a_spd + ";" + monster_x.a_crate + ";" + monster_x.a_cdmg + ";" + monster_x.a_res + ";" + monster_x.a_acc + ";" + monster_x.a_dps + ";" + monster_x.a_effhp + ";" + monster_x.a_effhp_d + ";" + monster_x.m_hp + ";" + monster_x.m_atk + ";" + monster_x.m_def + ";" + monster_x.m_spd + ";" + monster_x.m_crate + ";" + monster_x.m_cdmg + ";" + monster_x.m_res + ";" + monster_x.m_acc + ";" + monster_x.m_dps + ";" + monster_x.m_effhp + ";" + monster_x.m_effhp_d + ";" + monster_x.slots246 + ";" + monster_x.substat_skillups + ";";
 					extendedMonsters += "\n";
 					
 					if (index + 1 < length && index % 100 == 0) {
@@ -2009,6 +2043,38 @@ function optimize(gridRunes, gridMons, focusSelected, saveToFile) {
 		});
 		
 	};
+	var callFinalize = function(optimize_run, totalLength) {
+		$("#opt_time").html("" + moment().format('MMM Do YY HH:mm:ss') + ": Calculating number of permutations " + totalLength + ". Calculating builds stats " + totalLength +" / " + totalLength + ". Preparing for display 0 / 1 (estimate " + calculateEstimate(totalLength) + " more seconds)");
+		$.ajax({
+			type: "POST",
+			url: "finalizeImport.php",
+			cache: false,
+			data: {
+				"optimize_run": optimize_run,
+				"sessionId": $('#sessionId').val(),
+			},
+			dataType: "json",
+			success: function(data){
+				if(data.optimize_run == parseInt($("#optimize_run").val(),10) && data.id == 1) {
+					displayBuilds();
+					gridOpt.draw();
+				}
+				else{
+					$("#opt_time").html("" + moment().format('MMM Do YY HH:mm:ss') + ": There was an error: " + data.error);
+				}
+			},
+			error: function(jqXHR, textStatus, errorThrown){
+				$("#opt_time").html("" + moment().format('MMM Do YY HH:mm:ss') + ": " + $("#optimize_error").val() + " Some of the builds failed to calculate and display.");
+				gridOpt.draw();
+			},
+			statusCode: {
+				500: function() {
+					$("#opt_time").html("" + moment().format('MMM Do YY HH:mm:ss') + ": " + $("#optimize_error").val() + " Some of the builds failed to calculate and display.");
+					gridOpt.draw();
+				}
+			}
+		});
+	};
 	var callOptimize = function() {
 		$.ajax({
 			type: "POST",
@@ -2037,10 +2103,15 @@ function optimize(gridRunes, gridMons, focusSelected, saveToFile) {
 					if(optimize_count == totalLength) {
 						if($("#optimize_error").val() != "") {
 							$("#opt_time").html("" + moment().format('MMM Do YY HH:mm:ss') + ": " + $("#optimize_error").val() + " Some of the builds failed to calculate and display.");
+							gridOpt.draw();
 						}else {
-							displayBuilds();
+							if(useFile == 1) {
+								callFinalize(optimize_run, totalLength);
+							}else {
+								displayBuilds();
+								gridOpt.draw();
+							}
 						}
-						gridOpt.draw();
 					}
 				}
 			},
@@ -2582,7 +2653,7 @@ $(document).ready(function(){
 	$("#optimize_count").val("0");
 	$("#optimize_calls_count").val("0");
 	$("#optimize_run").val("0");
-	$('#sessionId').val( moment().format('mmss') + Math.floor((Math.random() * 100) + 1) );
+	$('#sessionId').val( moment().format('mmss') + Math.floor((Math.random() * 10) + 1) + Math.floor((Math.random() * 10) + 1) );
 	
 	var savedBuilds = [];
 	$('#savedBuilds').val(JSON.stringify(savedBuilds));
@@ -3121,7 +3192,7 @@ $(document).ready(function(){
 	$('#rune_optimize_abort').on( 'click', function(e) {
 		e.preventDefault();
 		clearTimeout(asyncProcess);
-		fireAlert("success", "Optimization aborted. You can see the generated so far builds.");
+		fireAlert("success", "Optimization aborted.");
 		gridOpt.draw();
 	});
 		
@@ -3176,7 +3247,7 @@ $(document).ready(function(){
 	$('#rune_optimize_abort_focus').on( 'click', function(e) {
 		e.preventDefault();
 		clearTimeout(asyncProcess);
-		fireAlert("success", "Optimization aborted. You can see the generated so far builds.");
+		fireAlert("success", "Optimization aborted.");
 		gridOpt.draw();
 	});
 	
